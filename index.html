@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="ko" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Seat Picker</title>
+  
+  <script src="/_sdk/element_sdk.js"></script>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Noto+Sans+KR:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="h-full overflow-auto" style="background:var(--bg);">
+  <div id="app" class="w-full h-full flex flex-col" style="background:var(--bg);">
+    <header class="w-full px-5 pt-4 pb-3 flex items-center justify-between flex-shrink-0" style="border-bottom:1px solid rgba(255,255,255,0.05);">
+      <div class="flex items-center gap-3">
+        <div style="background:var(--primary);width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:white;">
+          <i data-lucide="layout-grid" style="width:20px;height:20px;"></i>
+        </div>
+        <h1 id="mainTitle" class="text-xl font-bold" style="color:var(--text);">Seat Picker</h1>
+      </div>
+      <div class="flex gap-2 items-center">
+        <select id="loadLayoutSelect" class="text-sm" style="min-width:160px; height: 38px;"> 
+          <option value="">저장된 배치 불러오기</option> 
+        </select> 
+        <button id="saveLayoutBtn" class="btn-secondary h-[38px] gap-1.5" title="현재 배치 저장"> 
+          <i data-lucide="save" style="width:15px;height:15px;"></i> 저장 
+        </button> 
+        <button id="deleteLayoutBtn" class="btn-danger h-[38px]" title="선택된 배치 삭제"> 
+          <i data-lucide="trash-2" style="width:15px;height:15px;"></i> 
+        </button>
+      </div>
+    </header>
+    
+    <div class="flex flex-1 overflow-hidden">
+      <aside class="flex flex-col gap-3 p-4 overflow-y-auto flex-shrink-0" style="width:280px;border-right:1px solid rgba(255,255,255,0.05);">
+        <div class="panel">
+          <div class="section-label">배치 설정</div>
+          
+          <div class="flex gap-2 mb-3">
+            <div class="flex-1 flex items-center justify-between rounded-lg px-3 py-2" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); height: 38px;">
+              <span class="text-xs" style="color:rgba(255,255,255,0.4);">행</span> 
+              <input id="rowsInput" type="number" value="5" min="1" max="10" class="w-10 text-right font-medium text-white" style="background:transparent !important; border:none !important; padding:0 !important; height: auto !important; font-size: 14px; outline: none; box-shadow: none;">
+            </div>
+            <div class="flex-1 flex items-center justify-between rounded-lg px-3 py-2" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); height: 38px;">
+              <span class="text-xs" style="color:rgba(255,255,255,0.4);">열</span> 
+              <input id="colsInput" type="number" value="6" min="1" max="10" class="w-10 text-right font-medium text-white" style="background:transparent !important; border:none !important; padding:0 !important; height: auto !important; font-size: 14px; outline: none; box-shadow: none;">
+            </div>
+          </div>
+          
+          <div class="flex items-center justify-between mb-3 px-1">
+            <span class="text-xs text-white/70 font-medium">짝꿍 모드</span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="pairModeToggle" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <button id="applyGridBtn" class="btn-primary w-full h-[38px] gap-1.5"> 
+            <i data-lucide="grid-3x3" style="width:15px;height:15px;"></i> 배치표 적용
+          </button>
+        </div>
+        
+        <div class="panel">
+          <div class="section-label">학생 관리</div>
+          <div class="flex gap-2 mb-3">
+            <input id="studentNameInput" type="text" placeholder="이름 입력 후 Enter" class="flex-1 min-w-0"> 
+            <button id="addStudentBtn" class="btn-primary flex-shrink-0" style="padding:0; width:38px; height:38px;"> 
+              <i data-lucide="plus" style="width:16px;height:16px;"></i> 
+            </button>
+          </div>
+          <div class="flex gap-2 flex-wrap">
+            <button id="bulkAddBtn" class="btn-secondary flex-1 h-[34px] gap-1.5" style="font-size:12px;"> 
+              <i data-lucide="list" style="width:13px;height:13px;"></i> 일괄입력
+            </button> 
+            <button id="clearAllBtn" class="btn-danger flex-1 h-[34px] gap-1.5" style="font-size:12px;"> 
+              <i data-lucide="x" style="width:13px;height:13px;"></i> 전체삭제
+            </button>
+          </div>
+        </div>
+        
+        <div class="panel flex-1 flex flex-col" style="min-height:120px;">
+          <div class="section-label flex items-center justify-between">
+            <span>미배치 학생 <span id="poolCount" style="color:var(--primary);">0</span></span>
+          </div>
+          <div id="studentPool" class="pool-area flex-1 overflow-y-auto flex flex-wrap gap-2 content-start p-2 rounded-xl" style="background:rgba(255,255,255,0.02);border:1.5px dashed rgba(255,255,255,0.06);min-height:60px;">
+          </div>
+        </div>
+      </aside>
+      
+      <main class="flex-1 flex flex-col items-center justify-center overflow-auto p-4">
+        <div class="seat-grid-wrapper">
+          <div id="seatGrid" class="flex flex-col"></div>
+          <div class="blackboard">교탁</div>
+        </div>
+      </main>
+      
+      <aside class="flex flex-col gap-3 p-4 overflow-y-auto flex-shrink-0" style="width:260px;border-left:1px solid rgba(255,255,255,0.05);">
+        <div class="panel">
+          <div class="section-label">자리 배치</div>
+          <button id="shuffleBtn" class="btn-primary w-full mb-2 h-[38px] gap-1.5"> 
+            <i data-lucide="shuffle" style="width:15px;height:15px;"></i> 자리 섞기
+          </button> 
+          <button id="resetSeatsBtn" class="btn-secondary w-full mb-2 h-[38px] gap-1.5"> 
+            <i data-lucide="rotate-ccw" style="width:15px;height:15px;"></i> 자리 초기화
+          </button>
+          <button id="excelExportBtn" class="btn-secondary w-full h-[38px] gap-1.5" style="background: rgba(16, 185, 129, 0.1); color: #34d399; border-color: rgba(16, 185, 129, 0.2);"> 
+            <i data-lucide="download" style="width:15px;height:15px;"></i> 엑셀로 저장 (CSV)
+          </button>
+        </div>
+        
+        <details class="panel group">
+          <summary class="section-label flex justify-between items-center cursor-pointer m-0 p-0" style="margin-bottom:0;">
+            <span>이웃 제외 쌍</span>
+            <i data-lucide="chevron-down" class="transition-transform duration-200 group-open:rotate-180" style="width:14px;height:14px;color:rgba(255,255,255,0.4);"></i>
+          </summary>
+          
+          <div class="pt-3">
+            <p class="text-xs mb-2" style="color:rgba(255,255,255,0.4);">옆, 앞뒤, 대각선 금지</p>
+            <div class="flex gap-1 mb-2">
+              <select id="excludeA" class="flex-1 text-xs" style="height:34px; padding:0 10px !important;"></select> 
+              <span style="color:rgba(255,255,255,0.3);line-height:34px;">↔</span> 
+              <select id="excludeB" class="flex-1 text-xs" style="height:34px; padding:0 10px !important;"></select>
+            </div>
+            <button id="addExcludeBtn" class="btn-secondary w-full mb-2 h-[34px] gap-1.5" style="font-size:12px;"> 
+              <i data-lucide="user-x" style="width:13px;height:13px;"></i> 제외 쌍 추가
+            </button>
+            <div id="excludeList" class="flex flex-col gap-1 max-h-32 overflow-y-auto"></div>
+          </div>
+        </details>
+      </aside>
+    </div>
+  </div>
+  
+  <div id="toast" class="toast"></div>
+  
+  <div id="bulkModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box">
+      <h3 class="text-lg font-bold mb-1" style="color:var(--text);">일괄 학생 입력</h3>
+      <p class="text-xs mb-3" style="color:rgba(255,255,255,0.4);">한 줄에 한 명씩 이름을 입력하세요</p>
+      <textarea id="bulkTextarea" rows="8" class="w-full mb-3" placeholder="홍길동&#10;김철수&#10;이영희" style="padding:14px !important; height:auto !important;"></textarea>
+      <div class="flex gap-2 justify-end">
+        <button id="bulkCancelBtn" class="btn-secondary">취소</button> 
+        <button id="bulkConfirmBtn" class="btn-primary">추가</button>
+      </div>
+    </div>
+  </div>
+  
+  <div id="confirmModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box text-center">
+      <div style="font-size:40px;margin-bottom:12px;">⚠️</div>
+      <p id="confirmMsg" class="text-sm mb-4" style="color:var(--text);"></p>
+      <div class="flex gap-2 justify-center">
+        <button id="confirmNo" class="btn-secondary">취소</button> 
+        <button id="confirmYes" class="btn-danger">확인</button>
+      </div>
+    </div>
+  </div>
+  
+  <script src="app.js"></script>
+</body>
+</html>
