@@ -14,17 +14,12 @@ window.addEventListener('keydown', e => { if (e.key === 'Alt') altPressed = true
 window.addEventListener('keyup', e => { if (e.key === 'Alt') altPressed = false; });
 
 document.getElementById('pairModeToggle').addEventListener('change', (e) => {
-    isPairMode = e.target.checked;
-    renderGrid();
+  isPairMode = e.target.checked;
+  renderGrid();
 });
 
 // ===== HELPERS =====
-function showToast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2200);
-}
+function uid() { return '_' + Math.random().toString(36).substr(2, 9); }
 
 function showConfirm(msg, cb) {
   document.getElementById('confirmMsg').textContent = msg;
@@ -40,7 +35,38 @@ document.getElementById('confirmNo').onclick = () => {
   document.getElementById('confirmModal').style.display = 'none';
 };
 
-function uid() { return '_' + Math.random().toString(36).substr(2, 9); }
+// 🌟 스택형 + 중요 알림 시스템
+function showToast(msg, isImportant = false) {
+  const container = document.getElementById('toastContainer');
+  const toast = document.createElement('div');
+  
+  toast.className = `toast ${isImportant ? 'important' : ''}`;
+  
+  const removeToast = () => {
+    toast.classList.remove('show');
+    setTimeout(() => toast.remove(), 300);
+  };
+
+  if (isImportant) {
+    toast.innerHTML = `
+      <span>${msg}</span>
+      <div class="toast-close" title="닫기">✕</div>
+    `;
+    const closeBtn = toast.querySelector('.toast-close');
+    closeBtn.onclick = removeToast;
+  } else {
+    toast.innerHTML = `<span>${msg}</span>`;
+  }
+
+  container.appendChild(toast);
+  
+  setTimeout(() => toast.classList.add('show'), 10);
+
+  // 중요 알림이 아닐 때만 2.5초 후 자동 삭제
+  if (!isImportant) {
+    setTimeout(removeToast, 2500);
+  }
+}
 
 // ===== GRID =====
 function initGrid() {
@@ -74,24 +100,25 @@ function renderGrid() {
       cell.dataset.col = c;
 
       if (isPairMode && (cols - c) % 2 === 0 && c !== 0) {
-          cell.style.marginLeft = 'clamp(16px, 3vw, 40px)'; 
+        cell.style.marginLeft = 'clamp(16px, 3vw, 40px)'; 
       }
 
       const seatNum = (rows - 1 - r) * cols + (cols - 1 - c) + 1;
 
+      // 🟢 번호는 기본적으로 생성 (취소선 효과를 위해 결번도 포함)
+      if (!grid[r][c]) {
+           const numSpan = document.createElement('span');
+           numSpan.className = 'seat-number';
+           numSpan.textContent = seatNum;
+           cell.appendChild(numSpan);
+      }
+
+      // 🟢 렌더링 시 인라인 스타일 제거, 클래스로 제어
       if (disabledCells.has(`${r},${c}`)) {
-        cell.style.background = 'rgba(255,255,255,0.02)';
-        cell.style.borderColor = 'rgba(255,255,255,0.03)';
-        cell.style.opacity = '0.3';
+        cell.classList.add('disabled'); // 🌟 CSS 클래스 추가
         cell.title = '결번 (클릭하여 활성화)';
       } else {
-         cell.title = '클릭하여 결번 처리';
-         if (!grid[r][c]) {
-             const numSpan = document.createElement('span');
-             numSpan.className = 'seat-number';
-             numSpan.textContent = seatNum;
-             cell.appendChild(numSpan);
-         }
+        cell.title = '클릭하여 결번 처리';
       }
 
       const sid = grid[r][c];
@@ -111,12 +138,13 @@ function renderGrid() {
         handleDrop(r, c);
       });
       cell.addEventListener('click', e => {
-        if (!grid[r][c] || e.target === cell) {
-          const key = `${r},${c}`;
-          if (disabledCells.has(key)) disabledCells.delete(key);
-          else disabledCells.add(key);
-          renderGrid();
-        }
+        // 학생 카드가 있는 곳은 무시
+        if (cell.classList.contains('has-student')) return;
+        
+        const key = `${r},${c}`;
+        if (disabledCells.has(key)) disabledCells.delete(key);
+        else disabledCells.add(key);
+        renderGrid();
       });
 
       rowDiv.appendChild(cell);
@@ -133,14 +161,30 @@ function makeCard(student, inGrid = false, r = null, c = null) {
   card.dataset.id = student.id;
   card.textContent = student.name;
 
-  const del = document.createElement('div');
-  del.className = 'delete-student';
-  del.innerHTML = '✕';
-  del.onclick = (e) => {
-    e.stopPropagation();
-    removeStudent(student.id);
-  };
-  card.appendChild(del);
+  const actionBtn = document.createElement('div');
+  
+  if (inGrid) {
+    actionBtn.className = 'return-student';
+    actionBtn.innerHTML = '↺';
+    actionBtn.title = '미배치 풀로 내리기';
+    actionBtn.onclick = (e) => {
+      e.stopPropagation();
+      grid[r][c] = null;
+      pinnedSeats = pinnedSeats.filter(p => p.studentId !== student.id);
+      renderGrid();
+      renderPool();
+      showToast(`${student.name} 학생이 미배치로 돌아갔습니다.`);
+    };
+  } else {
+    actionBtn.className = 'delete-student';
+    actionBtn.innerHTML = '✕';
+    actionBtn.title = '학생 영구 삭제';
+    actionBtn.onclick = (e) => {
+      e.stopPropagation();
+      removeStudent(student.id);
+    };
+  }
+  card.appendChild(actionBtn);
 
   if (inGrid) {
     const pinBtn = document.createElement('div');
@@ -209,7 +253,7 @@ function placeUnassignedToPool() {
   renderGrid();
 }
 
-// ===== DRAG & DROP 스왑/이동 =====
+// ===== DRAG & DROP =====
 function handleDrop(r, c) {
   if (!dragData) return;
   if (disabledCells.has(`${r},${c}`)) return showToast('결번 자리입니다.');
@@ -263,7 +307,10 @@ document.getElementById('studentPool').addEventListener('drop', e => {
 function addStudent(name) {
   name = name.trim();
   if (!name) return;
-  if (students.find(s => s.name === name)) { showToast('이미 존재하는 이름입니다'); return; }
+  if (students.find(s => s.name === name)) { 
+    showToast(`'${name}'(은)는 이미 존재하는 이름입니다.`, true); 
+    return; 
+  }
   students.push({ id: uid(), name });
   renderPool();
   showToast(`${name} 추가됨`);
@@ -295,19 +342,32 @@ document.getElementById('bulkAddBtn').onclick = () => {
 document.getElementById('bulkCancelBtn').onclick = () => {
   document.getElementById('bulkModal').style.display = 'none';
 };
+
 document.getElementById('bulkConfirmBtn').onclick = () => {
   const text = document.getElementById('bulkTextarea').value;
   let count = 0;
+  let dupes = [];
+  
   text.split('\n').forEach(line => {
     const name = line.trim();
-    if (name && !students.find(s => s.name === name)) {
-      students.push({ id: uid(), name });
-      count++;
+    if (name) {
+      if (students.find(s => s.name === name)) {
+        dupes.push(name);
+      } else {
+        students.push({ id: uid(), name });
+        count++;
+      }
     }
   });
+  
   document.getElementById('bulkModal').style.display = 'none';
   renderPool();
-  showToast(`${count}명 추가됨`);
+  
+  if (dupes.length > 0) {
+    showToast(`${count}명 추가됨 (⚠️ 중복 제외: ${dupes.join(', ')})`, true);
+  } else if (count > 0) {
+    showToast(`${count}명 추가됨`);
+  }
 };
 
 document.getElementById('clearAllBtn').onclick = () => {
@@ -372,7 +432,7 @@ window.removeExclude = (id) => {
 function loadLayoutsMenu() {
     const layouts = JSON.parse(localStorage.getItem('seatPickerLayouts') || '[]');
     const select = document.getElementById('loadLayoutSelect');
-    select.innerHTML = '<option value="">저장된 배치 불러오기</option>'; // 🟢 이모지 제거됨
+    select.innerHTML = '<option value="">저장된 배치 불러오기</option>'; 
     layouts.forEach(l => {
         select.innerHTML += `<option value="${l.id}">${l.name}</option>`;
     });
@@ -437,7 +497,7 @@ function applyLayout(layout, isTrick = false) {
     }
 }
 
-// ===== EXPORT TO EXCEL (CSV) =====
+// ===== EXPORT TO EXCEL =====
 document.getElementById('excelExportBtn').onclick = () => {
     let csvContent = "\uFEFF"; 
     
@@ -531,16 +591,13 @@ document.getElementById('shuffleBtn').onclick = () => {
       const layouts = JSON.parse(localStorage.getItem('seatPickerLayouts') || '[]');
       const trickLayout = layouts.find(l => l.name.startsWith('!'));
       if(trickLayout) {
-          if (trickLayout.rows !== rows || trickLayout.cols !== cols || (trickLayout.isPairMode !== undefined && trickLayout.isPairMode !== isPairMode)) {
-              showToast('배치 조건(행/열 크기, 짝꿍 모드)을 확인해 주세요.');
-              return;
-          }
-          
           const isPinnedMatch = trickLayout.pinnedSeats.length === pinnedSeats.length && 
                                 trickLayout.pinnedSeats.every(p => pinnedSeats.some(cp => cp.studentId === p.studentId && cp.row === p.row && cp.col === p.col));
                                 
-          if (!isPinnedMatch) {
-              showToast('고정된 자리(📌)가 배치 조건과 충돌합니다. 다시 확인해 주세요.');
+          if (trickLayout.rows !== rows || trickLayout.cols !== cols || 
+              (trickLayout.isPairMode !== undefined && trickLayout.isPairMode !== isPairMode) || 
+              !isPinnedMatch) {
+              showToast('배치 조건(행/열 크기, 짝꿍 모드, 고정 등)이 저장된 데이터와 다릅니다.', true);
               return;
           }
 
@@ -591,7 +648,7 @@ document.getElementById('shuffleBtn').onclick = () => {
   }
 
   if(!success) {
-      showToast('제외 조건을 만족하는 배치를 찾지 못했습니다. 다시 시도하세요.');
+      showToast('제외 조건을 만족하는 배치를 찾지 못했습니다. 다시 시도하세요.', true);
   } else {
       renderGrid();
       renderPool();
