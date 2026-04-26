@@ -498,6 +498,7 @@ function applyLayout(layout, isTrick = false) {
 }
 
 // ===== EXPORT TO EXCEL =====
+// 🛠️ 수정 1: 결번/빈자리를 텍스트 없이 빈칸("")으로 저장
 document.getElementById('excelExportBtn').onclick = () => {
     let csvContent = "\uFEFF"; 
     
@@ -505,14 +506,14 @@ document.getElementById('excelExportBtn').onclick = () => {
         let rowData = [];
         for (let c = 0; c < cols; c++) {
             if (disabledCells.has(`${r},${c}`)) {
-                rowData.push("결번");
+                rowData.push(""); // 결번 -> 빈칸 처리
             } else {
                 const sid = grid[r][c];
                 if (sid) {
                     const s = students.find(x => x.id === sid);
                     rowData.push(s ? s.name : "");
                 } else {
-                    rowData.push("빈자리");
+                    rowData.push(""); // 빈자리 -> 빈칸 처리
                 }
             }
         }
@@ -586,6 +587,7 @@ function checkExclude(tempGrid) {
     return true;
 }
 
+// 🛠️ 수정 2: 주작 모드 시 '결번(disabledCells)' 일치 여부도 검사하여 불일치 시 빨간 경고창
 document.getElementById('shuffleBtn').onclick = () => {
   if (altPressed) {
       const layouts = JSON.parse(localStorage.getItem('seatPickerLayouts') || '[]');
@@ -594,10 +596,15 @@ document.getElementById('shuffleBtn').onclick = () => {
           const isPinnedMatch = trickLayout.pinnedSeats.length === pinnedSeats.length && 
                                 trickLayout.pinnedSeats.every(p => pinnedSeats.some(cp => cp.studentId === p.studentId && cp.row === p.row && cp.col === p.col));
                                 
+          // 🟢 결번 매칭 확인 로직 추가
+          const trickDisabled = trickLayout.disabledCells || [];
+          const isDisabledMatch = trickDisabled.length === disabledCells.size && 
+                                  trickDisabled.every(dc => disabledCells.has(dc));
+                                
           if (trickLayout.rows !== rows || trickLayout.cols !== cols || 
               (trickLayout.isPairMode !== undefined && trickLayout.isPairMode !== isPairMode) || 
-              !isPinnedMatch) {
-              showToast('배치 조건(행/열 크기, 짝꿍 모드, 고정 등)이 저장된 데이터와 다릅니다.', true);
+              !isPinnedMatch || !isDisabledMatch) {
+              showToast('배치 조건(행/열 크기, 짝꿍 모드, 고정, 결번 등)이 저장된 데이터와 다릅니다.', true); // true 인자로 빨간 중요 메시지 띄움
               return;
           }
 
